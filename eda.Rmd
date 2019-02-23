@@ -10,8 +10,21 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 ```
 
+# Data Cleaning
+
+We will delete rows that do not have any information about race. This should be okay because there are approximately 1.3 million rows of empty race information, and we will still have ~8.7 million rows.
+
+We might choose to delete 
+
+## Removing NAs
+
+
 
 ```{r}
-hdma <- read_csv("hmda_lar.csv", n_max = 1000)
+hdma <- read_csv("hmda_lar.csv", n_max = 100000)
 
+na_str <- "Information not provided by applicant in mail, Internet, or telephone application"
+
+# Remove NA/not provided rows
+new_hdma <- hdma %>% subset(!(applicant_race_name_1 %in% c(na_str, "Not applicable")))
 ```
