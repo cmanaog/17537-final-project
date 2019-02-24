@@ -42,12 +42,12 @@ new_hmda <- new_hmda %>% subset(!(co_applicant_race_name_1 %in% c(na_str)))
 new_hmda <- new_hmda %>% subset(!(co_applicant_sex_name %in% c(na_str)))
 
 # Only run if you want to save cleaned file
-# save(new_hmda, file = "hmda_cleaned.csv")
+write.csv(new_hmda, file = "hmda_cleaned.csv")
 ```
 
 
 ```{r}
-loan <- read_csv("hmda_cleaned.csv")
+loan <- read_csv("hmda_cleaned.csv", n_max = 10000)
 summary(loan)
 ```
 
