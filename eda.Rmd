@@ -16,13 +16,10 @@ We will delete rows that do not have any information about race. This should be 
 
 We will drop ethnicity as well since this is encaptured by race. 
 
-
-
 ## Removing NAs
 
 
-
-```{r}
+```{r data clean, eval= FALSE}
 hmda <- read_csv("hmda_lar.csv")
 
 na_str <- "Information not provided by applicant in mail, Internet, or telephone application"
@@ -48,6 +45,12 @@ new_hmda <- new_hmda %>% subset(!(co_applicant_sex_name %in% c(na_str)))
 # save(new_hmda, file = "hmda_cleaned.csv")
 ```
 
+
+```{r}
+loan <- read_csv("hmda_cleaned.csv")
+summary(loan)
+
+```
 
 
 
