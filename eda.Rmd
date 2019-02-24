@@ -8,6 +8,17 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+
+project_theme  <- theme(axis.text = element_text(size = 8, 
+                                                   color = "azure4"),
+                          axis.title = element_text(color = "dimgrey"),
+                          plot.title = element_text(size = 14),
+                          plot.caption = element_text(face = "italic",
+                                                      hjust = 0.5), 
+                          legend.title = element_text(size = 11),
+                          text = element_text(size = 10,
+                                              color = "black"),
+                          panel.background = element_rect(fill = "ghostwhite"))
 ```
 
 # Data Cleaning
@@ -43,20 +54,79 @@ new_hmda <- new_hmda %>% subset(!(co_applicant_sex_name %in% c(na_str)))
 
 # Only run if you want to save cleaned file
 write.csv(new_hmda, file = "hmda_cleaned.csv")
+new_hmda %>% select(action_taken_name) %>% 
 ```
 
 
 ```{r}
 library(GGally)
-loan <- read_csv("hmda_cleaned.csv", n_max = 10000)
+loan <- read_csv("hmda_cleaned.csv")
+
 # Remove X1 artifact
+loan %>% select(action_taken_name) %>% unique
+loan %>% group_by(action_taken_name) %>% summarize(count = n())
 loan <- loan %>% select(-X1)
 loan <- loan %>% mutate(
-  tract_to_msamd_income = as.double(loan$tract_to_msamd_income), 
-  rate_spread = as.double(loan$rate_spread))
-loan$population 
-ggpairs(loan)
+  tract_to_msamd_income = as.double(tract_to_msamd_income), 
+  rate_spread = as.double(rate_spread),
+  population = as.double(population),
+  minority_population = as.double(minority_population),
+  number_of_owner_occupied_units = as.double(number_of_owner_occupied_units),
+  number_of_1_to_4_family_units = as.double(number_of_1_to_4_family_units),
+  approved = ifelse(action_taken_name == "Loan originated", "Y", "N"))
 
+loan %>% colnames
+loan %>% select(applicant_race_name_1) %>% unique
+ggplot(loan, aes(x = applicant_race_name_1)) +
+  geom_bar(aes(fill = approved)) +
+  labs(x = "Race", y = "Count", title = "Distribution of Loan Approval by Race",
+       fill = " Loan Originated") + 
+  theme(axis.text.x =element_text(angle = 20, hjust = 1)) + 
+  project_theme
+
+# Race
+ggplot(loan, aes(x = applicant_race_name_1)) +
+  geom_bar(aes(fill = approved)) +
+  labs(x = "Race", y = "Count", title = "Distribution of Loan Approval by Race",
+       fill = " Loan Originated") + 
+  theme(axis.text.x =element_text(angle = 10)) + 
+  project_theme
+
+# Sex
+ggplot(loan, aes(x = applicant_sex_name)) +
+  geom_bar(aes(fill = approved)) +
+  labs(x = "Sex", y = "Count", title = "Distribution of Loan Approval by Sex",
+       fill = " Loan Originated") + 
+  theme(axis.text.x =element_text(angle = 10)) + 
+  project_theme
+
+ggplot(loan, aes(x = applicant_sex_name)) +
+  geom_bar(aes(fill = approved)) +
+  labs(x = "Sex", y = "Count", title = "Distribution of Loan Approval by Sex",
+       fill = " Loan Originated") + 
+  theme(axis.text.x =element_text(angle = 10)) + 
+  project_theme
+
+# State
+ggplot(loan, aes(x =state_abbr)) +
+  geom_bar(aes(fill = approved)) +
+  labs(x = "State of Loan Request",
+       y = "Count",
+       title = "Distribution of Loan Approval by State",
+       fill = " Loan Originated") + 
+  theme(axis.text.x =element_text(angle = 90, hjust = 1)) + 
+  project_theme
+
+# co-applicant
+
+ggplot(loan, aes(x = approved)) +
+  geom_bar(aes(fill = co_applicant_race_name_1)) +
+  labs(x = "Co-Applicant Race",
+       y = "Count",
+       title = "Distribution of Loan Approval by State",
+       fill = " Loan Originated") + 
+  theme(axis.text.x =element_text(angle = 90, hjust = 1)) + 
+  project_theme
 ```
 
 
