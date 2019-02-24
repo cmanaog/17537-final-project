@@ -77,12 +77,6 @@ loan <- loan %>% mutate(
 
 loan %>% colnames
 loan %>% select(applicant_race_name_1) %>% unique
-ggplot(loan, aes(x = applicant_race_name_1)) +
-  geom_bar(aes(fill = approved)) +
-  labs(x = "Race", y = "Count", title = "Distribution of Loan Approval by Race",
-       fill = " Loan Originated") + 
-  theme(axis.text.x =element_text(angle = 20, hjust = 1)) + 
-  project_theme
 
 # Race
 ggplot(loan, aes(x = applicant_race_name_1)) +
@@ -93,13 +87,6 @@ ggplot(loan, aes(x = applicant_race_name_1)) +
   project_theme
 
 # Sex
-ggplot(loan, aes(x = applicant_sex_name)) +
-  geom_bar(aes(fill = approved)) +
-  labs(x = "Sex", y = "Count", title = "Distribution of Loan Approval by Sex",
-       fill = " Loan Originated") + 
-  theme(axis.text.x =element_text(angle = 10)) + 
-  project_theme
-
 ggplot(loan, aes(x = applicant_sex_name)) +
   geom_bar(aes(fill = approved)) +
   labs(x = "Sex", y = "Count", title = "Distribution of Loan Approval by Sex",
