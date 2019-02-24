@@ -47,8 +47,16 @@ write.csv(new_hmda, file = "hmda_cleaned.csv")
 
 
 ```{r}
+library(GGally)
 loan <- read_csv("hmda_cleaned.csv", n_max = 10000)
-summary(loan)
+# Remove X1 artifact
+loan <- loan %>% select(-X1)
+loan <- loan %>% mutate(
+  tract_to_msamd_income = as.double(loan$tract_to_msamd_income), 
+  rate_spread = as.double(loan$rate_spread))
+loan$population 
+ggpairs(loan)
+
 ```
 
 
