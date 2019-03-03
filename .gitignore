@@ -28,3 +28,4 @@ rsconnect/
 *.csv
 .Rproj.user
 .hmda_cleaned.csv.swp
+hmda_cleaned.csv.zip

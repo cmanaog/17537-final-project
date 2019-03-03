@@ -91,7 +91,6 @@ ggplot(loan, aes(x = applicant_sex_name)) +
   geom_bar(aes(fill = approved)) +
   labs(x = "Sex", y = "Count", title = "Distribution of Loan Approval by Sex",
        fill = " Loan Originated") + 
-  theme(axis.text.x =element_text(angle = 10)) + 
   project_theme
 
 # State
@@ -115,14 +114,6 @@ ggplot(loan, aes(x = approved)) +
   theme(axis.text.x =element_text(angle = 90, hjust = 1)) + 
   project_theme
 ```
-
-
-
-
-
-
-
-
 
 
 
