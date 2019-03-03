@@ -17,7 +17,8 @@ project_theme  <- theme(axis.text = element_text(size = 8,
                                                       hjust = 0.5), 
                           legend.title = element_text(size = 11),
                           text = element_text(size = 10,
-                                              color = "black"),
+                                              color = "black",
+                                              family = "serif"),
                           panel.background = element_rect(fill = "ghostwhite"))
 ```
 
@@ -119,15 +120,6 @@ ggplot(loan, aes(x = approved)) +
 
 ```{r}
 
-loan <- hmda
-head(loan)
-
-```
-
-
-
-```{r}
-
 # income histogram
 
 ggplot(filter(loan, applicant_income_000s < 2000), aes(applicant_income_000s)) +
@@ -156,7 +148,6 @@ ggplot(filter(loan, loan_amount_000s < 2000), aes(loan_amount_000s)) +
 
 # obs left out of graph
 loan %>% filter(loan_amount_000s >= 2000) %>% nrow()
-
 
 ```
 
