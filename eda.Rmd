@@ -31,7 +31,7 @@ We will drop ethnicity as well since this is encaptured by race.
 
 
 ```{r data clean, eval= FALSE}
-hmda <- read_csv("hmda_lar.csv")
+hmda <- read_csv("hmda_lar.csv", n_max = 1000)
 
 na_str <- "Information not provided by applicant in mail, Internet, or telephone application"
 # Remove NA/not provided rows
@@ -54,7 +54,7 @@ new_hmda <- new_hmda %>% subset(!(co_applicant_sex_name %in% c(na_str)))
 
 # Only run if you want to save cleaned file
 write.csv(new_hmda, file = "hmda_cleaned.csv")
-new_hmda %>% select(action_taken_name) %>% 
+#new_hmda %>% select(action_taken_name) %>% 
 ```
 
 
@@ -117,16 +117,83 @@ ggplot(loan, aes(x = approved)) +
 ```
 
 
+```{r}
+
+loan <- hmda
+head(loan)
+
+```
 
 
 
+```{r}
+
+# income histogram
+
+ggplot(filter(loan, applicant_income_000s < 2000), aes(applicant_income_000s)) +
+  geom_histogram(binwidth = 50) + 
+  labs(x = "Income (Thousands)",
+       y = "", 
+       title = "Distribution of Applicant Income") +
+  project_theme
+
+# obs left out of graph
+loan %>% filter(applicant_income_000s >= 2000) %>% nrow()
+
+
+```
+
+
+```{r}
+
+# loan amount requested distribution
+ggplot(filter(loan, loan_amount_000s < 2000), aes(loan_amount_000s)) +
+  geom_histogram(binwidth = 50) + 
+  labs(x = "Loan Amount (Thousands)",
+       y = "", 
+       title = "Distribution of Loan amount requested") +
+  project_theme
+
+# obs left out of graph
+loan %>% filter(loan_amount_000s >= 2000) %>% nrow()
+
+
+```
 
 
 
+```{r}
+
+library(stringr)
+# Applicant income by race boxplot
+ggplot(filter(loan, applicant_income_000s < 500), aes(x = applicant_race_name_1, y = applicant_income_000s)) +
+  geom_boxplot() +
+  labs(x = "Applicant Race",
+       y = "Applicant Income (Thousands)",
+       title = "Distribution of Applicant Income by Race") +
+  project_theme +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 20))
+
+# obs left out of the graph
+loan %>% filter(applicant_income_000s >= 500) %>% nrow()
+```
 
 
+```{r}
 
+# Applicant income by race boxplot
+ggplot(filter(loan, loan_amount_000s < 1000), aes(x = applicant_race_name_1, y = loan_amount_000s)) +
+  geom_boxplot() +
+  labs(x = "Applicant Race",
+       y = "Applicant Loan Amount (Thousands)",
+       title = "Distribution of Applicant Income by Race") +
+  project_theme +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 20))
 
+# obs left out of graph
+loan %>% filter(loan_amount_000s >= 1000) %>% nrow()
+
+```
 
 
 
