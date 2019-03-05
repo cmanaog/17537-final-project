@@ -74,11 +74,11 @@ loan <- loan %>% mutate(
   minority_population = as.double(minority_population),
   number_of_owner_occupied_units = as.double(number_of_owner_occupied_units),
   number_of_1_to_4_family_units = as.double(number_of_1_to_4_family_units),
-  approved = ifelse(action_taken_name == "Loan originated", "Y", "N"))
+  approved = ifelse(action_taken_name %in% c("Loan originated", "Application approved but not accepted"), "Y", "N"))
 
-loan %>% colnames
-loan %>% select(applicant_race_name_1) %>% unique
+```
 
+```{r}
 # Race
 ggplot(loan, aes(x = applicant_race_name_1)) +
   geom_bar(aes(fill = approved)) +
@@ -185,3 +185,23 @@ loan %>% filter(loan_amount_000s >= 1000) %>% nrow()
 
 ```
 
+
+```{r}
+## 75% of the sample size
+smp_size <- floor(0.75 * nrow(loan))
+
+## set the seed to make your partition reproducible
+set.seed(42)
+train_ind <- sample(seq_len(nrow(loan)), size = smp_size)
+class(loan)
+train <- loan[train_ind,]
+test <- loan[-train_ind,]
+class(train)
+# Create train dataset
+write.csv(train, file = "train.csv")
+
+
+# Create test dataset
+write.csv(test, file = "test.csv")
+
+```
