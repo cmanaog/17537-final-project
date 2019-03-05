@@ -196,7 +196,6 @@ train_ind <- sample(seq_len(nrow(loan)), size = smp_size)
 class(loan)
 train <- loan[train_ind,]
 test <- loan[-train_ind,]
-class(train)
 # Create train dataset
 write.csv(train, file = "train.csv")
 
