@@ -32,7 +32,7 @@ We will drop ethnicity as well since this is encaptured by race.
 
 
 ```{r data clean, eval= FALSE}
-hmda <- read_csv("hmda_lar.csv", n_max = 1000)
+hmda <- read_csv("hmda_lar.csv")
 
 na_str <- "Information not provided by applicant in mail, Internet, or telephone application"
 # Remove NA/not provided rows
@@ -54,7 +54,7 @@ new_hmda <- new_hmda %>% subset(!(co_applicant_race_name_1 %in% c(na_str)))
 new_hmda <- new_hmda %>% subset(!(co_applicant_sex_name %in% c(na_str)))
 
 # Only run if you want to save cleaned file
-write.csv(new_hmda, file = "hmda_cleaned.csv")
+
 #new_hmda %>% select(action_taken_name) %>% 
 ```
 
@@ -116,6 +116,7 @@ ggplot(loan, aes(x = approved)) +
   theme(axis.text.x =element_text(angle = 90, hjust = 1)) + 
   project_theme
 ```
+
 
 
 ```{r}
@@ -188,6 +189,17 @@ loan %>% filter(loan_amount_000s >= 1000) %>% nrow()
 
 
 
+```{r}
+
+ggplot(filter(loan, applicant_income_000s < 500), 
+       aes(x = approved, y = applicant_income_000s)) + 
+  geom_boxplot() +
+  labs(x = "Approved for loan",
+       y = "Income",
+       title = "Income Distribution by Loan Approval") +
+  project_theme
+
+```
 
 
 
