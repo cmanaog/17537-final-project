@@ -12,7 +12,7 @@ class Ann(object):
         self.n_hidden = n_hidden
         self.learning_rate = learning_rate
         self.weights = np.random.uniform(-0.05, 0.05, (n_in, n_hidden))
-        self.out = np.random.uniform(-0.05, 0.05, n_out) # output weights: 1 x n_hidden
+        self.output_weights = np.random.uniform(-0.05, 0.05, n_out) # output weights: 1 x n_hidden
         self.hidden_layer_out = np.zeros(n_out)
         self.first_layer_deriv = np.zeros(n_out)
         self.output_deriv = 0
@@ -32,7 +32,6 @@ class Ann(object):
         data = np.matrix(train_vec) # 1 x n_in
         # print(np.append(np.array(data.dot(self.weights)), 1))
         # for each elem in data, make it 0, if it's neg
-        #
         first_layer = self.relu(data.dot(self.weights)) # 1 x n_hidden
         first_layer = np.append(np.array(first_layer), 1) # adding bias term, 1 x n_hidden + 1
 
@@ -42,14 +41,14 @@ class Ann(object):
         # TODO: logit = apply sigmoid to each elem of first_layer
         logit = first_layer
 
-        result = self.sigmoid(first_layer.dot(self.out)) # probablity of 0 or 1
+        result = self.sigmoid(first_layer.dot(self.output_weights)) # probablity of 0 or 1
         if result > 0.5: result = 1
         else: result = 0
 
         if store: # save computation if we're not using backprop
             self.hidden_layer_out = first_layer
-            self.output_deriv = self.sigmoid(first_layer.dot(self.out), True)
-            self.first_layer_deriv = map(self.relu_deriv, first_layer_into_node)
+            self.output_deriv = self.sigmoid(first_layer.dot(self.output_weights), deriv = True)
+            self.first_layer_deriv = self.relu(first_layer_into_node, deriv = True)
             self.first_layer_deriv[-1] = 1 # We think this is bias
         return (logit, result)
 
@@ -62,11 +61,11 @@ class Ann(object):
         '''
         error = truth - output # constant La
         self.delta_k = error * self.output_deriv
-        self.delta_h = self.first_layer_deriv * self.out * self.delta_k
+        self.delta_h = self.first_layer_deriv * self.output_weights * self.delta_k
 
         # update the weights b/w hidden layer and output
         gradient_top = self.learning_rate * self.delta_k * self.hidden_layer_out
-        self.out = self.out + gradient_top
+        self.output_weights = self.output_weights + gradient_top
 
 
         # update the weights b/w hidden layer and input
@@ -75,23 +74,25 @@ class Ann(object):
         self.weights = self.weights + gradient_bottom
 
 
-    def softmax(x):
+    def softmax(self, x):
         return np.exp(x)/sum(np.exp(x))
 
-    def relu(x):
-        return np.maximum(np.zeros(self.n_hidden), x)
+    def relu(self, x, deriv = False):
+        if deriv:
+            np.where(x > 1, 1, 0)
+        return np.maximum(0, x)
 
-    def relu_deriv(x):
+    def relu_deriv(self, x):
         if (x > 0): return 1
         else: return 0
 
-    def sigmoid(net, deriv = False):
+    def sigmoid(self, net, deriv = False):
         '''
         @param: net (float) - a weighted sum
         @param: deriv (bool) - indicates whether to use derivative or not
         '''
         if deriv:
-            return sigmoid(net) * (1 - sigmoid(net))
+            return self.sigmoid(net) * (1 - self.sigmoid(net))
         else:
             return 1.0 / (1.0 + np.exp(-1.0 * net))
 
@@ -104,7 +105,7 @@ def train(train, target, n_in, n_out, n_hidden, learning_rate = 0.1):
     @param: learning_rate (int) - step for gradient descent, defaults to 0.05
     @return: network (Ann) - trained neural network
     '''
-    # Create a feed-forward network with n_in inpputs, n_hidden hidden units,
+    # Create a feed-forward network with n_in inputs, n_hidden hidden units,
     # and n_out output units
     # Init all network weights to small random numbers (between [-0.05,0.05])
 
@@ -128,8 +129,8 @@ def train(train, target, n_in, n_out, n_hidden, learning_rate = 0.1):
 
             # L = ly - alpha * Ld
 
-
             error_rate += (target[row] - output)**2
+            if row % 100000 == 0: print(row)
         count += 1
         print("error rate = " + str(0.5 * error_rate))
     return network
@@ -141,14 +142,14 @@ def main():
     @param: test (str) - path to testing data (2d)
     '''
     ################## TUNING ########################
-    n_hidden = 256 # magic number, change to tune neural net
-    eta = 0.01 # magic number, change to tune neural net
+    n_hidden = 5 # magic number, change to tune neural net
+    eta = 0.001 # magic number, change to tune neural net
     ##################################################
-    train_data = pd.read_csv("~/Downloads/train_clean.csv")
+    train_data = pd.read_csv("train_clean.csv") #nrows to read in less
     x_train = np.asarray(train_data.iloc[:, 1:-1], dtype = np.float64)
     y_train = np.asarray(train_data.iloc[:, -1], dtype = np.float64)
 
-    test_data = pd.read_csv("~/Downloads/test_clean.csv")
+    test_data = pd.read_csv("test_clean.csv")
     x_test = np.asarray(test_data.iloc[:, 1:-1], dtype = np.float64)
     y_test = np.asarray(test_data.iloc[:, -1], dtype = np.float64)
 
