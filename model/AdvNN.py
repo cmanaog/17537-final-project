@@ -32,6 +32,7 @@ class Ann(object):
         data = np.matrix(train_vec) # 1 x n_in
         # print(np.append(np.array(data.dot(self.weights)), 1))
         # for each elem in data, make it 0, if it's neg
+
         first_layer = self.relu(data.dot(self.weights)) # 1 x n_hidden
         first_layer = np.append(np.array(first_layer), 1) # adding bias term, 1 x n_hidden + 1
 
@@ -52,26 +53,30 @@ class Ann(object):
             self.first_layer_deriv[-1] = 1 # We think this is bias
         return (logit, result)
 
-    def update_weights(self, output, truth, train):
+    def update_weights(self, output, truth, train, adv_loss = 0):
         '''
         @param: output (float) - output of neural net
         @param: truth (str) - supervised label of data, yes or no
         @param: train(1d list) - input values
         @return: None - updates weights of neural net using grad. desc.
         '''
+        print(truth)
+        print(output)
         error = truth - output # constant La
         self.delta_k = error * self.output_deriv
         self.delta_h = self.first_layer_deriv * self.output_weights * self.delta_k
 
         # update the weights b/w hidden layer and output
         gradient_top = self.learning_rate * self.delta_k * self.hidden_layer_out
-        self.output_weights = self.output_weights + gradient_top
-
+        self.output_weights = self.output_weights + gradient_top - adv_loss
 
         # update the weights b/w hidden layer and input
         self.delta_h = np.delete(self.delta_h, -1) # remove bias
         gradient_bottom = self.learning_rate * np.matrix(train).transpose() * np.matrix(self.delta_h)
-        self.weights = self.weights + gradient_bottom
+        
+        self.weights = self.weights + gradient_bottom - adv_loss
+
+        return gradient_bottom
 
 
     def softmax(self, x):
@@ -82,9 +87,8 @@ class Ann(object):
             np.where(x > 1, 1, 0)
         return np.maximum(0, x)
 
-    def relu_deriv(self, x):
-        if (x > 0): return 1
-        else: return 0
+    def cross_entropy(self, x):
+        return
 
     def sigmoid(self, net, deriv = False):
         '''
@@ -96,7 +100,15 @@ class Ann(object):
         else:
             return 1.0 / (1.0 + np.exp(-1.0 * net))
 
-def train(train, target, n_in, n_out, n_hidden, learning_rate = 0.1):
+
+# class Adv(Ann):
+
+#     def update_weights(self):
+
+#         return
+                
+
+def train(train, target, n_in, n_out, n_hidden, adv_hidden, learning_rate = 0.1):
     '''
     @param: train (2d list) - training input data
     @param: target (1d list) - output data from training data
@@ -110,29 +122,39 @@ def train(train, target, n_in, n_out, n_hidden, learning_rate = 0.1):
     # Init all network weights to small random numbers (between [-0.05,0.05])
 
     network = Ann(n_in, n_out, n_hidden, learning_rate)
+    adv = Ann(n_hidden + 1, adv_hidden + 1, adv_hidden, learning_rate)
     count = 0
-    while count < 1250:
+
+    pred_target, adv_target = target[0], target[1]
+
+    while count < 1:
         error_rate = 0
         # For each training vector and output,
         for row in range(train.shape[0]):
             # Input x to the network and computer output o_u
+            print("MAIN FEED FORWARD")
             (logit, output) = network.feed_forward(train[row], store = True)
-
-            # update weights of approval network (Ly)
-            la = network.update_weights(output, target[row], train[row])
 
             # get output for race
                 # another feed_forward with logit as the input
+            print("ADVERSARY FEED FORWARD")
+            _, adv_output = adv.feed_forward(logit, store = True)
 
             # update the weight for race nn (Ld)
             # ld = network.update_weights(output_race, race_col_from_train_x, logit)
+            print("ADVERSARY WEIGHT UPDATE")
+            ld = adv.update_weights(adv_output, adv_target[row], logit)
+
+            # update weights of approval network (Ly)
+            print("MAIN WEIGHT UPDATE")
+            la = network.update_weights(output, pred_target[row], train[row], adv_loss = ld)
 
             # L = ly - alpha * Ld
 
-            error_rate += (target[row] - output)**2
-            if row % 100000 == 0: print(row)
+            error_rate += (pred_target[row] - output)**2
+            #if row % 100000 == 0: print(row)
         count += 1
-        print("error rate = " + str(0.5 * error_rate))
+        #print("error rate = " + str(0.5 * error_rate))
     return network
 
 def main():
@@ -143,24 +165,32 @@ def main():
     '''
     ################## TUNING ########################
     n_hidden = 5 # magic number, change to tune neural net
+    adv_hidden = 5
     eta = 0.001 # magic number, change to tune neural net
     ##################################################
-    train_data = pd.read_csv("train_clean.csv") #nrows to read in less
+    print("Reading in data")
+    train_data = pd.read_csv("train_clean.csv", nrows = 100) #nrows to read in less
+    train_data = train_data.drop("Unnamed: 0", axis = 1)
     x_train = np.asarray(train_data.iloc[:, 1:-1], dtype = np.float64)
-    y_train = np.asarray(train_data.iloc[:, -1], dtype = np.float64)
+    y_train = (np.asarray(train_data["approved"], dtype = np.float64),
+               np.asarray(train_data["applicant_race_name_1"], dtype = np.float64))
+    print("Completed reading in data")
 
     test_data = pd.read_csv("test_clean.csv")
+    test_data = test_data.drop("Unnamed: 0", axis = 1)
     x_test = np.asarray(test_data.iloc[:, 1:-1], dtype = np.float64)
-    y_test = np.asarray(test_data.iloc[:, -1], dtype = np.float64)
+    y_test = (np.asarray(test_data["approved"], dtype = np.float64),
+              np.asarray(test_data["applicant_race_name_1"], dtype = np.float64))
 
     n_in = x_train.shape[1]
     n_out = n_hidden + 1 # only one output
     start = time.time()
-    trained_nn = train(x_train, y_train, n_in, n_out, n_hidden, eta)
+    trained_nn = train(x_train, y_train, n_in, n_out, n_hidden, adv_hidden, eta)
     end = time.time()
     sys.stdout.write("TRAINING COMPLETED! NOW PREDICTING.\n")
-    for row in test_data:
-        output = trained_nn.feed_forward(row)
-        sys.stdout.write(str(np.round(output)) + "\n")
+    #for row in x_test:
+        #print(row)
+    #    output = trained_nn.feed_forward(row)
+    #    sys.stdout.write(str(np.round(output[1])) + "\n")
 
-main()
+#main()
