@@ -6,7 +6,7 @@ import pandas as pd
 
 class Ann(object):
 
-    def __init__(self, n_in, n_out, n_hidden, learning_rate):
+    def __init__(self, n_in, n_out, n_hidden, learning_rate, alpha):
         self.n_in = n_in
         self.n_out = n_out
         self.n_hidden = n_hidden
@@ -18,6 +18,7 @@ class Ann(object):
         self.output_deriv = 0
         self.delta_k = 0
         self.delta_h = np.zeros((n_in, n_hidden))
+        self.alpha = alpha
 
     def feed_forward(self, train_vec, store = False):
         '''
@@ -68,13 +69,13 @@ class Ann(object):
 
         # update the weights b/w hidden layer and output
         gradient_top = self.learning_rate * self.delta_k * self.hidden_layer_out
-        self.output_weights = self.output_weights + gradient_top - adv_loss
+        self.output_weights = self.output_weights + gradient_top - self.alpha * adv_loss
 
         # update the weights b/w hidden layer and input
         self.delta_h = np.delete(self.delta_h, -1) # remove bias
         gradient_bottom = self.learning_rate * np.matrix(train).transpose() * np.matrix(self.delta_h)
         
-        self.weights = self.weights + gradient_bottom - adv_loss
+        self.weights = self.weights + gradient_bottom - self.alpha * adv_loss # adv_loss should be same size as weights
 
         return gradient_bottom
 
@@ -101,14 +102,14 @@ class Ann(object):
             return 1.0 / (1.0 + np.exp(-1.0 * net))
 
 
-# class Adv(Ann):
+class Adv(Ann):
 
-#     def update_weights(self):
+    def calc_main_grad(self):
 
-#         return
-                
+        return 
+          
 
-def train(train, target, n_in, n_out, n_hidden, adv_hidden, learning_rate = 0.1):
+def train(train, target, n_in, n_out, n_hidden, adv_hidden, learning_rate = 0.1, alpha):
     '''
     @param: train (2d list) - training input data
     @param: target (1d list) - output data from training data
@@ -121,8 +122,8 @@ def train(train, target, n_in, n_out, n_hidden, adv_hidden, learning_rate = 0.1)
     # and n_out output units
     # Init all network weights to small random numbers (between [-0.05,0.05])
 
-    network = Ann(n_in, n_out, n_hidden, learning_rate)
-    adv = Ann(n_hidden + 1, adv_hidden + 1, adv_hidden, learning_rate)
+    network = Ann(n_in, n_out, n_hidden, learning_rate, alpha)
+    adv = Adv(n_hidden + 1, adv_hidden + 1, adv_hidden, learning_rate, 0)
     count = 0
 
     pred_target, adv_target = target[0], target[1]
@@ -140,10 +141,11 @@ def train(train, target, n_in, n_out, n_hidden, adv_hidden, learning_rate = 0.1)
             print("ADVERSARY FEED FORWARD")
             _, adv_output = adv.feed_forward(logit, store = True)
 
-            # update the weight for race nn (Ld)
+            # calculate the partial for main nn and update the weight for race nn (Ld)
             # ld = network.update_weights(output_race, race_col_from_train_x, logit)
             print("ADVERSARY WEIGHT UPDATE")
-            ld = adv.update_weights(adv_output, adv_target[row], logit)
+            ld = adv.calc_main_grad(adv_output, adv_target[row], logit, network)
+            adv.update_weights(adv_output, adv_target[row], logit)
 
             # update weights of approval network (Ly)
             print("MAIN WEIGHT UPDATE")
@@ -155,7 +157,7 @@ def train(train, target, n_in, n_out, n_hidden, adv_hidden, learning_rate = 0.1)
             #if row % 100000 == 0: print(row)
         count += 1
         #print("error rate = " + str(0.5 * error_rate))
-    return network
+    return network, adv
 
 def main():
     '''
@@ -167,6 +169,7 @@ def main():
     n_hidden = 5 # magic number, change to tune neural net
     adv_hidden = 5
     eta = 0.001 # magic number, change to tune neural net
+    alpha = 1 # tuning param for adversary
     ##################################################
     print("Reading in data")
     train_data = pd.read_csv("train_clean.csv", nrows = 100) #nrows to read in less
@@ -185,7 +188,7 @@ def main():
     n_in = x_train.shape[1]
     n_out = n_hidden + 1 # only one output
     start = time.time()
-    trained_nn = train(x_train, y_train, n_in, n_out, n_hidden, adv_hidden, eta)
+    trained_nn, trained_adv = train(x_train, y_train, n_in, n_out, n_hidden, adv_hidden, eta, alpha)
     end = time.time()
     sys.stdout.write("TRAINING COMPLETED! NOW PREDICTING.\n")
     #for row in x_test:
