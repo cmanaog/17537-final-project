@@ -3,21 +3,23 @@ import numpy as np
 import random
 import time
 import pandas as pd
+from sklearn.metrics import log_loss
 
 class Ann(object):
 
-    def __init__(self, n_in, n_out, n_hidden, learning_rate, alpha):
+    def __init__(self, n_in, n_classes, n_hidden, learning_rate, alpha):
         self.n_in = n_in
-        self.n_out = n_out
+        self.n_classes = n_classes # number of classes in final output
         self.n_hidden = n_hidden
+        self.n_out = n_hidden + 1 # shape of weights for final layer
         self.learning_rate = learning_rate
-        self.weights = np.random.uniform(-0.05, 0.05, (n_in, n_hidden))
-        self.output_weights = np.random.uniform(-0.05, 0.05, n_out) # output weights: 1 x n_hidden
-        self.hidden_layer_out = np.zeros(n_out)
-        self.first_layer_deriv = np.zeros(n_out)
+        self.weights = np.random.uniform(-0.05, 0.05, (self.n_in, self.n_hidden))
+        self.output_weights = np.random.uniform(-0.05, 0.05, self.n_out) # output weights
+        self.hidden_layer_out = np.zeros(self.n_out)
+        self.first_layer_deriv = np.zeros(self.n_out)
         self.output_deriv = 0
         self.delta_k = 0
-        self.delta_h = np.zeros((n_in, n_hidden))
+        self.delta_h = np.zeros((self.n_in, self.n_hidden))
         self.alpha = alpha
 
     def feed_forward(self, train_vec, store = False):
@@ -28,8 +30,9 @@ class Ann(object):
             [2] = P1 [0, 100]
             [3] = P2 [0, 100]
             [4] = F[0, 100]
-        @return: result (int) - 0 or 1, classification of node
+        @return: result (array-like) - 1 x 2 array, probability of class 0 or class 1
         '''
+        result = [None, None]
         data = np.matrix(train_vec) # 1 x n_in
         # print(np.append(np.array(data.dot(self.weights)), 1))
         # for each elem in data, make it 0, if it's neg
@@ -43,9 +46,10 @@ class Ann(object):
         # TODO: logit = apply sigmoid to each elem of first_layer
         logit = first_layer
 
-        result = self.sigmoid(first_layer.dot(self.output_weights)) # probablity of 0 or 1
-        if result > 0.5: result = 1
-        else: result = 0
+        result[1] = self.sigmoid(first_layer.dot(self.output_weights)) # probablity of class 1
+        result[0] = 1 - result[1] # probability of class 0
+        # if result > 0.5: result = 1
+        # else: result = 0
 
         if store: # save computation if we're not using backprop
             self.hidden_layer_out = first_layer
@@ -88,9 +92,6 @@ class Ann(object):
             np.where(x > 1, 1, 0)
         return np.maximum(0, x)
 
-    def cross_entropy(self, x):
-        return
-
     def sigmoid(self, net, deriv = False):
         '''
         @param: net (float) - a weighted sum
@@ -104,12 +105,51 @@ class Ann(object):
 
 class Adv(Ann):
 
+    def __init__(self):
+        super().__init__()
+        self.n_classes = len(set())
+        self.output_weights = np.random.uniform(-0.05, 0.05, (n_out, n_classes)) # output weights: 1 x n_hidden
+
     def calc_main_grad(self):
+        pass   
 
-        return 
-          
+    def feed_forward(self, train_vec, store = False):
+        '''
+      @param: train_vec (1d list) - training examples
+            [0] = M1 [0, 100]
+            [1] = M2 [0, 100]
+            [2] = P1 [0, 100]
+            [3] = P2 [0, 100]
+            [4] = F[0, 100]
+        @return: result (array-like) - 1 x 2 array, probability of class 0 or class 1
+        '''
+        result = [None, None]
+        data = np.matrix(train_vec) # 1 x n_in
+        # print(np.append(np.array(data.dot(self.weights)), 1))
+        # for each elem in data, make it 0, if it's neg
 
-def train(train, target, n_in, n_out, n_hidden, adv_hidden, learning_rate = 0.1, alpha):
+        first_layer = self.relu(data.dot(self.weights)) # 1 x n_hidden
+        first_layer = np.append(np.array(first_layer), 1) # adding bias term, 1 x n_hidden + 1
+
+        # the vector that feeds into the activation function
+        first_layer_into_node = np.append(np.array(data.dot(self.weights)), 1) # 1 x n_hidden + 1
+
+        # TODO: logit = apply sigmoid to each elem of first_layer
+        logit = first_layer
+
+        result[1] = self.sigmoid(first_layer.dot(self.output_weights)) # probablity of class 1
+        result[0] = 1 - result[1] # probability of class 0
+        # if result > 0.5: result = 1
+        # else: result = 0
+
+        if store: # save computation if we're not using backprop
+            self.hidden_layer_out = first_layer
+            self.output_deriv = self.sigmoid(first_layer.dot(self.output_weights), deriv = True)
+            self.first_layer_deriv = self.relu(first_layer_into_node, deriv = True)
+            self.first_layer_deriv[-1] = 1 # We think this is bias
+        return (logit, result)
+
+def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 0.1, alpha = 1):
     '''
     @param: train (2d list) - training input data
     @param: target (1d list) - output data from training data
@@ -121,25 +161,28 @@ def train(train, target, n_in, n_out, n_hidden, adv_hidden, learning_rate = 0.1,
     # Create a feed-forward network with n_in inputs, n_hidden hidden units,
     # and n_out output units
     # Init all network weights to small random numbers (between [-0.05,0.05])
-
-    network = Ann(n_in, n_out, n_hidden, learning_rate, alpha)
-    adv = Adv(n_hidden + 1, adv_hidden + 1, adv_hidden, learning_rate, 0)
+    n_classes_main, n_classes_adv = n_classes
+    network = Ann(n_in, n_classes_main, n_hidden, learning_rate, alpha)
+    adv = Adv(n_hidden + 1, n_classes_adv, adv_hidden, learning_rate, 0)
     count = 0
 
     pred_target, adv_target = target[0], target[1]
-
+    print(adv_target)
     while count < 1:
         error_rate = 0
+        main_error = []
+        adv_error = []
         # For each training vector and output,
         for row in range(train.shape[0]):
             # Input x to the network and computer output o_u
             print("MAIN FEED FORWARD")
-            (logit, output) = network.feed_forward(train[row], store = True)
-
+            (logit, main_output) = network.feed_forward(train[row], store = True)
+            main_error.append(main_output)
             # get output for race
                 # another feed_forward with logit as the input
             print("ADVERSARY FEED FORWARD")
             _, adv_output = adv.feed_forward(logit, store = True)
+            adv_error.append(adv_output)
 
             # calculate the partial for main nn and update the weight for race nn (Ld)
             # ld = network.update_weights(output_race, race_col_from_train_x, logit)
@@ -149,14 +192,14 @@ def train(train, target, n_in, n_out, n_hidden, adv_hidden, learning_rate = 0.1,
 
             # update weights of approval network (Ly)
             print("MAIN WEIGHT UPDATE")
-            la = network.update_weights(output, pred_target[row], train[row], adv_loss = ld)
+            la = network.update_weights(np.argmax(main_output), pred_target[row], train[row], adv_loss = ld)
 
             # L = ly - alpha * Ld
 
-            error_rate += (pred_target[row] - output)**2
             #if row % 100000 == 0: print(row)
         count += 1
-        #print("error rate = " + str(0.5 * error_rate))
+        error_rate += log_loss(pred_target, main_output) - log_loss(adv_target, adv_output) 
+        print("cross entropy loss = " + str(error_rate))
     return network, adv
 
 def main():
@@ -179,16 +222,16 @@ def main():
                np.asarray(train_data["applicant_race_name_1"], dtype = np.float64))
     print("Completed reading in data")
 
-    test_data = pd.read_csv("test_clean.csv")
+    test_data = pd.read_csv("test_clean.csv", nrows = 100)
     test_data = test_data.drop("Unnamed: 0", axis = 1)
     x_test = np.asarray(test_data.iloc[:, 1:-1], dtype = np.float64)
     y_test = (np.asarray(test_data["approved"], dtype = np.float64),
               np.asarray(test_data["applicant_race_name_1"], dtype = np.float64))
 
     n_in = x_train.shape[1]
-    n_out = n_hidden + 1 # only one output
+    n_classes = len(set(y_test[0])), len(set(y_test[1]))
     start = time.time()
-    trained_nn, trained_adv = train(x_train, y_train, n_in, n_out, n_hidden, adv_hidden, eta, alpha)
+    trained_nn, trained_adv = train(x_train, y_train, n_in, n_classes, n_hidden, adv_hidden, eta, alpha)
     end = time.time()
     sys.stdout.write("TRAINING COMPLETED! NOW PREDICTING.\n")
     #for row in x_test:
@@ -196,4 +239,4 @@ def main():
     #    output = trained_nn.feed_forward(row)
     #    sys.stdout.write(str(np.round(output[1])) + "\n")
 
-#main()
+main()
