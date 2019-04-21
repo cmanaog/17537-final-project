@@ -73,18 +73,26 @@ class Ann(object):
 
         # update the weights b/w hidden layer and output
         gradient_top = self.learning_rate * self.delta_k * self.hidden_layer_out
-        self.output_weights = self.output_weights + gradient_top - self.alpha * adv_loss
+        self.output_weights = self.output_weights + gradient_top - self.alpha * adv_loss[0]
 
         # update the weights b/w hidden layer and input
         self.delta_h = np.delete(self.delta_h, -1) # remove bias
         gradient_bottom = self.learning_rate * np.matrix(train).transpose() * np.matrix(self.delta_h)
         
-        self.weights = self.weights + gradient_bottom - self.alpha * adv_loss # adv_loss should be same size as weights
+        self.weights = self.weights + gradient_bottom - self.alpha * adv_loss[1] # adv_loss should be same size as weights
 
         return gradient_bottom
 
 
-    def softmax(self, x):
+    def softmax(self, x, deriv = False):
+        if deriv: # output_size x output_size
+            res = np.zeros((x.shape[0], x.shape[0]))
+            for i in range(res.shape[0]):
+                for j in range(res.shape[1]):
+                    if i == j: delt = 1
+                    else: delt = 0
+                    res[i,j] = x[i] * (delt - x[j])
+            return res
         return np.exp(x)/sum(np.exp(x))
 
     def relu(self, x, deriv = False):
@@ -105,13 +113,24 @@ class Ann(object):
 
 class Adv(Ann):
 
-    def __init__(self):
-        super().__init__()
-        self.n_classes = len(set())
-        self.output_weights = np.random.uniform(-0.05, 0.05, (n_out, n_classes)) # output weights: 1 x n_hidden
+    def __init__(self, n_in, n_classes, n_hidden, learning_rate, alpha):
+        super().__init__(n_in, n_classes, n_hidden, learning_rate, alpha)
+        self.n_classes = n_classes
+        self.output_weights = np.random.uniform(-0.05, 0.05, (self.n_out, self.n_classes)) # output weights: n_hidden + 1 x n_classes
 
-    def calc_main_grad(self):
-        pass   
+
+    def calc_main_grad(self, output, truth, train, main_nn):
+        # top: d ce / d soft * d soft / d relu * d relu / d main out * d main out / w
+        # btm: d ce / d soft * d soft / d relu * d relu / d main out * d main out / main hid out * d main hid out / w
+        print(self.output)
+        dJ = - 1 / (self.output[int(truth)]) # i think this should be a scalar
+        print(dJ)
+        print(self.output_deriv.shape)
+        print(self.first_layer_deriv.shape)
+        print(main_nn.hidden_layer_out.shape)
+        grad_top = dJ * self.output_deriv * self.first_layer_deriv * main_nn.hidden_layer_out # 6 x 5
+        grad_btm = dJ * self.output_deriv * self.first_layer_deriv * main_nn.output_weights * main_nn.first_layer_deriv # n_in x 5 + 1
+        return grad_top, grad_btm
 
     def feed_forward(self, train_vec, store = False):
         '''
@@ -119,35 +138,30 @@ class Adv(Ann):
             [0] = M1 [0, 100]
             [1] = M2 [0, 100]
             [2] = P1 [0, 100]
-            [3] = P2 [0, 100]
-            [4] = F[0, 100]
+            [3] = P2 [0, 100            [4] = F[0, 100]
         @return: result (array-like) - 1 x 2 array, probability of class 0 or class 1
         '''
-        result = [None, None]
+        #result = [None] * self.n_classes
         data = np.matrix(train_vec) # 1 x n_in
         # print(np.append(np.array(data.dot(self.weights)), 1))
         # for each elem in data, make it 0, if it's neg
 
-        first_layer = self.relu(data.dot(self.weights)) # 1 x n_hidden
+        first_layer = self.relu(data.dot(self.weights)) # 1 x n_hidden, c
         first_layer = np.append(np.array(first_layer), 1) # adding bias term, 1 x n_hidden + 1
 
         # the vector that feeds into the activation function
         first_layer_into_node = np.append(np.array(data.dot(self.weights)), 1) # 1 x n_hidden + 1
 
-        # TODO: logit = apply sigmoid to each elem of first_layer
-        logit = first_layer
-
-        result[1] = self.sigmoid(first_layer.dot(self.output_weights)) # probablity of class 1
-        result[0] = 1 - result[1] # probability of class 0
-        # if result > 0.5: result = 1
-        # else: result = 0
+        result = self.softmax(first_layer.dot(self.output_weights)) # 1 x n_hidden + 1
+        pred = np.argmax(result)
 
         if store: # save computation if we're not using backprop
             self.hidden_layer_out = first_layer
-            self.output_deriv = self.sigmoid(first_layer.dot(self.output_weights), deriv = True)
+            self.output = result
+            self.output_deriv = self.softmax(first_layer.dot(self.output_weights), deriv = True)
             self.first_layer_deriv = self.relu(first_layer_into_node, deriv = True)
             self.first_layer_deriv[-1] = 1 # We think this is bias
-        return (logit, result)
+        return pred
 
 def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 0.1, alpha = 1):
     '''
@@ -167,7 +181,6 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
     count = 0
 
     pred_target, adv_target = target[0], target[1]
-    print(adv_target)
     while count < 1:
         error_rate = 0
         main_error = []
@@ -181,7 +194,7 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
             # get output for race
                 # another feed_forward with logit as the input
             print("ADVERSARY FEED FORWARD")
-            _, adv_output = adv.feed_forward(logit, store = True)
+            adv_output = adv.feed_forward(logit, store = True)
             adv_error.append(adv_output)
 
             # calculate the partial for main nn and update the weight for race nn (Ld)
@@ -229,7 +242,7 @@ def main():
               np.asarray(test_data["applicant_race_name_1"], dtype = np.float64))
 
     n_in = x_train.shape[1]
-    n_classes = len(set(y_test[0])), len(set(y_test[1]))
+    n_classes = 2, 5#len(set(y_test[0])), len(set(y_test[1]))
     start = time.time()
     trained_nn, trained_adv = train(x_train, y_train, n_in, n_classes, n_hidden, adv_hidden, eta, alpha)
     end = time.time()
