@@ -11,7 +11,7 @@ class Ann(object):
         self.n_in = n_in
         self.n_classes = n_classes # number of classes in final output
         self.n_hidden = n_hidden
-        self.n_out = n_hidden + 1 # shape of weights for final layer
+        self.n_out = n_hidden # shape of weights for final layer
         self.learning_rate = learning_rate
         self.weights = np.random.uniform(-0.05, 0.05, (self.n_in, self.n_hidden))
         self.output_weights = np.random.uniform(-0.05, 0.05, self.n_out) # output weights
@@ -38,10 +38,10 @@ class Ann(object):
         # for each elem in data, make it 0, if it's neg
 
         first_layer = self.relu(data.dot(self.weights)) # 1 x n_hidden
-        first_layer = np.append(np.array(first_layer), 1) # adding bias term, 1 x n_hidden + 1
+        first_layer = np.array(first_layer) # adding bias term, 1 x n_hidden + 1
 
         # the vector that feeds into the activation function
-        first_layer_into_node = np.append(np.array(data.dot(self.weights)), 1) # 1 x n_hidden + 1
+        first_layer_into_node = np.array(data.dot(self.weights)) # 1 x n_hidden + 1
 
         # TODO: logit = apply sigmoid to each elem of first_layer
         logit = first_layer
@@ -55,43 +55,53 @@ class Ann(object):
             self.hidden_layer_out = first_layer
             self.output_deriv = self.sigmoid(first_layer.dot(self.output_weights), deriv = True)
             self.first_layer_deriv = self.relu(first_layer_into_node, deriv = True)
-            self.first_layer_deriv[-1] = 1 # We think this is bias
+            #self.first_layer_deriv[-1] = 1 # We think this is bias
         return (logit, result)
 
-    def update_weights(self, output, truth, train, adv_loss = 0):
+    def update_weights(self, output, truth, train, adv_loss = (0,0)):
         '''
         @param: output (float) - output of neural net
         @param: truth (str) - supervised label of data, yes or no
         @param: train(1d list) - input values
         @return: None - updates weights of neural net using grad. desc.
         '''
-        print(truth)
-        print(output)
         error = truth - output # constant La
         self.delta_k = error * self.output_deriv
         self.delta_h = self.first_layer_deriv * self.output_weights * self.delta_k
 
         # update the weights b/w hidden layer and output
         gradient_top = self.learning_rate * self.delta_k * self.hidden_layer_out
+        # if type(adv_loss[0]) != int: print(self.output_weights.shape)
+        # print(adv_loss[0])
         self.output_weights = self.output_weights + gradient_top - self.alpha * adv_loss[0]
-
+        # if type(adv_loss[0]) != int:
+        #     print(self.output_weights.shape)
+        #     print("\n")
         # update the weights b/w hidden layer and input
-        self.delta_h = np.delete(self.delta_h, -1) # remove bias
+        #self.delta_h = np.delete(self.delta_h, -1) # remove bias
+
+        
         gradient_bottom = self.learning_rate * np.matrix(train).transpose() * np.matrix(self.delta_h)
         
+        # if type(adv_loss[1]) != int:
+        #     adv_loss[1] = adv_loss[1].transpose()
+        #print(self.weights)
+        # if type(adv_loss[1]) != int: print(self.weights.shape)
         self.weights = self.weights + gradient_bottom - self.alpha * adv_loss[1] # adv_loss should be same size as weights
-
+        # if type(adv_loss[1]) != int: 
+        #     print(self.weights.shape)
+        #     print("\n")
         return gradient_bottom
 
 
     def softmax(self, x, deriv = False):
         if deriv: # output_size x output_size
-            res = np.zeros((x.shape[0], x.shape[0]))
+            res = np.zeros((x.shape[1], x.shape[1]))
             for i in range(res.shape[0]):
                 for j in range(res.shape[1]):
                     if i == j: delt = 1
                     else: delt = 0
-                    res[i,j] = x[i] * (delt - x[j])
+                    res[i,j] = x[0,i] * (delt - x[0,j])
             return res
         return np.exp(x)/sum(np.exp(x))
 
@@ -119,18 +129,23 @@ class Adv(Ann):
         self.output_weights = np.random.uniform(-0.05, 0.05, (self.n_out, self.n_classes)) # output weights: n_hidden + 1 x n_classes
 
 
-    def calc_main_grad(self, output, truth, train, main_nn):
+    def calc_main_grad(self, output, truth, train, main_nn, main_train):
         # top: d ce / d soft * d soft / d relu * d relu / d main out * d main out / w
         # btm: d ce / d soft * d soft / d relu * d relu / d main out * d main out / main hid out * d main hid out / w
-        print(self.output)
-        dJ = - 1 / (self.output[int(truth)]) # i think this should be a scalar
-        print(dJ)
-        print(self.output_deriv.shape)
-        print(self.first_layer_deriv.shape)
-        print(main_nn.hidden_layer_out.shape)
-        grad_top = dJ * self.output_deriv * self.first_layer_deriv * main_nn.hidden_layer_out # 6 x 5
-        grad_btm = dJ * self.output_deriv * self.first_layer_deriv * main_nn.output_weights * main_nn.first_layer_deriv # n_in x 5 + 1
-        return grad_top, grad_btm
+        dJ = - 1 / (self.output[0,int(truth)]) # i think this should be a scalar
+        
+        a = dJ * self.output_deriv * self.output_weights * np.matrix(self.first_layer_deriv).transpose() #* train
+        grad_top = (np.matrix(a).transpose() * self.weights).transpose() * np.matrix(main_nn.hidden_layer_out)
+
+        #grad_top = dJ * self.output_deriv * self.first_layer_deriv * main_nn.hidden_layer_out # 6 x 5
+        print(grad_top.shape)
+
+        x = self.output_deriv.dot(np.diag(self.first_layer_deriv.flatten()))
+        y = x.dot(main_nn.output_weights)
+        z = dJ * y.dot(np.diag(main_nn.first_layer_deriv.flatten()))
+        grad_btm = np.matrix(z).transpose() * np.matrix(main_train)
+        
+        return grad_top, grad_btm.transpose()
 
     def feed_forward(self, train_vec, store = False):
         '''
@@ -147,10 +162,10 @@ class Adv(Ann):
         # for each elem in data, make it 0, if it's neg
 
         first_layer = self.relu(data.dot(self.weights)) # 1 x n_hidden, c
-        first_layer = np.append(np.array(first_layer), 1) # adding bias term, 1 x n_hidden + 1
+        first_layer = np.array(first_layer) # adding bias term, 1 x n_hidden + 1
 
         # the vector that feeds into the activation function
-        first_layer_into_node = np.append(np.array(data.dot(self.weights)), 1) # 1 x n_hidden + 1
+        first_layer_into_node = np.array(data.dot(self.weights)) # 1 x n_hidden + 1
 
         result = self.softmax(first_layer.dot(self.output_weights)) # 1 x n_hidden + 1
         pred = np.argmax(result)
@@ -160,7 +175,7 @@ class Adv(Ann):
             self.output = result
             self.output_deriv = self.softmax(first_layer.dot(self.output_weights), deriv = True)
             self.first_layer_deriv = self.relu(first_layer_into_node, deriv = True)
-            self.first_layer_deriv[-1] = 1 # We think this is bias
+            #self.first_layer_deriv[-1] = 1 # We think this is bias
         return pred
 
 def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 0.1, alpha = 1):
@@ -177,7 +192,7 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
     # Init all network weights to small random numbers (between [-0.05,0.05])
     n_classes_main, n_classes_adv = n_classes
     network = Ann(n_in, n_classes_main, n_hidden, learning_rate, alpha)
-    adv = Adv(n_hidden + 1, n_classes_adv, adv_hidden, learning_rate, 0)
+    adv = Adv(n_hidden, n_classes_adv, adv_hidden, learning_rate, 0)
     count = 0
 
     pred_target, adv_target = target[0], target[1]
@@ -200,8 +215,8 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
             # calculate the partial for main nn and update the weight for race nn (Ld)
             # ld = network.update_weights(output_race, race_col_from_train_x, logit)
             print("ADVERSARY WEIGHT UPDATE")
-            ld = adv.calc_main_grad(adv_output, adv_target[row], logit, network)
-            adv.update_weights(adv_output, adv_target[row], logit)
+            ld = adv.calc_main_grad(adv_output, adv_target[row], logit, network, train[row])
+            adv.update_weights(adv_output, adv_target[row], logit.transpose())
 
             # update weights of approval network (Ly)
             print("MAIN WEIGHT UPDATE")
