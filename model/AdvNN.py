@@ -72,7 +72,7 @@ class Ann(object):
         self.output_weights = self.output_weights + gradient_top 
         
         gradient_bottom = self.learning_rate * np.matrix(train).transpose() * np.matrix(self.delta_h)
-        
+        gradient_bottom = self.clip(gradient_bottom)
         self.weights = self.weights + gradient_bottom 
 
 
@@ -102,6 +102,11 @@ class Ann(object):
         else:
             return 1.0 / (1.0 + np.exp(-1.0 * net))
 
+    def clip(self, grad_btm, gamma = (-1, 1)):
+        a = np.maximum(gamma[0], grad_btm)
+        b = np.minimum(gamma[1], a)
+        return b
+
 
 class Adv(Ann):
 
@@ -125,27 +130,25 @@ class Adv(Ann):
 
         # update the weights b/w hidden layer and output
         gradient_top = self.learning_rate * np.array(self.delta_k) * np.array(self.hidden_layer_out)
-        
-
         gradient_bottom = self.learning_rate * np.matrix(train) * np.matrix(self.delta_h)
-        
-        # Adv weights update 
-        # self.weights = self.weights + gradient_bottom 
-        # self.output_weights = self.output_weights + gradient_top 
-
 
         # # MAIN NET UPDATES        
-        # grad_top = -self.alpha * main_nn.hidden_layer_out * self.weights * self.delta_h
 
-        # x = self.output_deriv.dot(np.diag(self.first_layer_deriv.flatten()))
-        # y = x.dot(main_nn.output_weights)
-        # z = dJ * y.dot(np.diag(main_nn.first_layer_deriv.flatten()))
-        print(main_nn.first_layer_deriv.transpose())
-        print(self.weights)
-        print(main_train.dot(main_nn.first_layer_deriv))
-        print(main_nn.first_layer_deriv)
-        grad_btm = main_train * main_nn.first_layer_deriv * self.weights #* self.delta_h 
-        print("grab btm", grad_btm.shape)        
+        grad_btm = np.matrix(main_train).transpose() * np.matrix(main_nn.first_layer_deriv) * np.matrix(self.weights) * np.matrix(self.delta_h)
+
+        grad_btm = self.clip(grad_btm)
+        print(grad_btm)
+        if np.isnan(grad_btm).any():
+         
+         print(main_nn.weights)
+        main_nn.weights = main_nn.weights - self.alpha * grad_btm
+        # Adv weights update 
+        gradient_top = self.clip(gradient_top)
+        gradient_bottom = self.clip(gradient_bottom)
+
+        self.weights = self.weights + gradient_bottom 
+        self.output_weights = self.output_weights + gradient_top 
+
 
     def feed_forward(self, train_vec, store = False):
         '''
@@ -176,6 +179,8 @@ class Adv(Ann):
             self.first_layer_deriv = self.relu(first_layer_into_node, deriv = True)
             #self.first_layer_deriv[-1] = 1 # We think this is bias
         return result, pred 
+
+
 
 def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 0.1, alpha = 1):
     '''
@@ -228,6 +233,7 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
 
             #if row % 100000 == 0: print(row)
         count += 1
+
         error_rate += log_loss(pred_target, main_error) - alpha * log_loss(adv_target, adv_error, labels = (0,1,2,3,4)) 
         print("cross entropy loss = " + str(error_rate))
     return network, adv
