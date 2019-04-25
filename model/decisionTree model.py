@@ -20,32 +20,33 @@ from sklearn.ensemble import AdaBoostClassifier
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.ensemble import BaggingClassifier
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
 
 from joblib import dump, load
 
 print "-- fetching data ..."
 
-train_data = pd.read_csv("../eda/train_clean.csv")
-x_train = np.asarray(train_data.iloc[:, 1:-1], dtype = np.float64)
-y_train = np.asarray(train_data.iloc[:, -1], dtype = np.float64)
+#train_data = pd.read_csv("~/Downloads/train_clean.csv")
+#x_train = np.asarray(train_data.iloc[:, 1:-1], dtype = np.float64)
+#y_train = np.asarray(train_data.iloc[:, -1], dtype = np.float64)
 
-np.save('x_train.npy', x_train)
-np.save('y_train.npy', y_train)
+#np.save('x_train.npy', x_train)
+#np.save('y_train.npy', y_train)
 
-#x_train = np.load('x_train.npy')
-#y_train = np.load('y_train.npy')
+x_train = np.load('x_train.npy')
+y_train = np.load('y_train.npy')
 
 print "read " + str(len(y_train)) + " train samples"
 
-test_data = pd.read_csv("../eda/test_clean.csv")
-x_test = np.asarray(test_data.iloc[:, 1:-1], dtype = np.float64)
-y_test = np.asarray(test_data.iloc[:, -1], dtype = np.float64)
+#test_data = pd.read_csv("~/Downloads/test_clean.csv")
+#x_test = np.asarray(test_data.iloc[:, 1:-1], dtype = np.float64)
+#y_test = np.asarray(test_data.iloc[:, -1], dtype = np.float64)
 
-np.save('x_test.npy', x_test)
-np.save('y_test.npy', y_test)
+#np.save('x_test.npy', x_test)
+#np.save('y_test.npy', y_test)
 
-#x_test = np.load('x_test.npy')
-#y_test = np.load('y_test.npy')
+x_test = np.load('x_test.npy')
+y_test = np.load('y_test.npy')
 
 print "read " + str(len(y_test)) + " test samples"
 
@@ -53,15 +54,28 @@ print "read " + str(len(y_test)) + " test samples"
 print "-- machine learning ..."
 
 # various classifiers to experiment with:
+#
+lg = LogisticRegression().fit(x_train, y_train)
+lg_predict = lg.predict(x_test)
+np.save('y_predict_lg', lg_predict)
+print "LG score: " + str(lg.score(x_test, y_test))
 
+'''
 rfclf = RandomForestClassifier(n_estimators=10).fit(x_train, y_train)
+y_predict_rfc = rfclf.predict(x_test)
+np.save('y_predict_rfc.npy', y_predict_rfc)
 print "RF score: " + str(rfclf.score(x_test, y_test))
 
 gbclf = GradientBoostingClassifier(n_estimators=100, learning_rate=0.1, max_depth=1, random_state=24).fit(x_train, y_train)
+y_predict_gbc = gbclf.predict(x_test)
+np.save('y_predict_gbclf.npy', y_predict_gbc)
+
 print "GB score: " + str(gbclf.score(x_test, y_test))
 
 knclf = KNeighborsClassifier(n_neighbors=5).fit(x_train, y_train)
+y_predict_knn =knclf.predict(x_test)
+np.save('y_predict_knclf.npy', y_predict_knn)
 print "KN score: " + str(knclf.score(x_test, y_test))
-
+'''
 
 print "-- done."
