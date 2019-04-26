@@ -144,8 +144,8 @@ class Adv(Ann):
         # btm: d ce / d soft * d soft / d relu * d relu / d main out * d main out / main hid out * d main hid out / w
         
         # ADV UPDATES 
-        error = np.zeros(5)
-        error[truth] = 1
+        error = np.zeros(self.n_classes)
+        error[int(truth)] = 1
         self.delta_k = np.matrix(error) * np.matrix(self.output_deriv) # 1x5
         self.delta_h = np.matrix(self.first_layer_deriv) * np.matrix(self.output_weights) * self.delta_k.transpose()  # 32 x 32, 32x5,  1x5
 
@@ -153,8 +153,11 @@ class Adv(Ann):
         gradient_top = self.learning_rate * np.matrix(self.hidden_layer_out).transpose() * np.matrix(self.delta_k) # 32x1 , 1x5
         gradient_bottom = self.learning_rate * np.matrix(train) * np.matrix(self.delta_h) #32x32 
 
-        # # MAIN NET UPDATES 
-        grad_btm = np.matrix(main_train).transpose() * np.matrix(main_nn.first_layer_deriv) #* np.matrix(self.weights) * np.matrix(self.delta_h)
+        # # MAIN NET UPDATES
+        self.delta_q = np.matrix(main_nn.first_layer_deriv) * np.matrix(self.weights) * np.matrix(self.delta_h)
+        #32x32, 32x32, 1x32
+        grad_btm = np.matrix(main_train).transpose() * np.matrix(self.delta_q).transpose()
+        # 31x1, 32x1
         grad_btm = self.clip(grad_btm)
 
         main_nn.weights = main_nn.weights - self.alpha * grad_btm
@@ -180,8 +183,8 @@ class Adv(Ann):
 
         first_layer = self.relu(data.dot(self.weights)) # 1 x n_hidden, c
         first_layer = np.array(first_layer) # adding bias term, 1 x n_hidden + 1
-        if not np.any(first_layer):
-            raise Exception("weights ", self.weights)
+        #if not np.any(first_layer):
+        #    raise Exception("weights ", self.weights)
 
 
         # the vector that feeds into the activation function
@@ -246,14 +249,6 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
         for row in range(train.shape[0]):
             # Input x to the network and computer output o_u
 
-            # if row < 10:
-            #     if prev_w is not None:
-            #         print("\n")
-            #         print("Hid w", np.allclose(prev_w, network.weights))
-            #         print("Out w", np.allclose(prev_out_w, network.output_weights))
-            #     prev_w = network.weights
-            #     prev_out_w = network.output_weights
-
             (logit, main_output) = network.feed_forward(train[row], pred_target[row], store = True)
             
             if len(main_output) != 2:
@@ -266,11 +261,11 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
 
             # get output for race
                 # another feed_forward with logit as the input
-            #adv_softmax, adv_output = adv.feed_forward(logit, adv_target[row], store = True)
-            #adv_error.append(adv_softmax)
+            adv_softmax, adv_output = adv.feed_forward(logit, adv_target[row], store = True)
+            adv_error.append(adv_softmax)
 
             # # calculate the partial for main nn and update the weight for race nn (Ld)
-            #adv.update_weights(adv_output, adv_target[row], logit, network, train[row])
+            adv.update_weights(adv_output, adv_target[row], logit, network, train[row])
 
         count += 1
         
@@ -336,12 +331,14 @@ def main():
     print(losses)
     sys.stdout.write("TRAINING COMPLETED! NOW PREDICTING.\n")
 
-    corrects = 0
+    test_errors = []
     for row in range(len(x_test)):
-        output = trained_nn.feed_forward(x_test[row], y_test[0][row])
-        if np.argmax(output[1]) == y_test[0][row]: corrects += 1
+        _, output = trained_nn.feed_forward(x_test[row], y_test[0][row])
+        test_errors.append(output)
+        #if np.argmax(output) == y_test[0][row]: corrects += 1
+    test_error_rate = log_loss(y_test[0][row], test_errors)
     print("\n")
-    print("Test accuracy: %f " % float(corrects / len(x_test)))
+    print("Test cross entropy: %f " % test_error_rate)
     # saving model
 #     print("SAVING MODEL")
 #     pickle.dump(trained_nn, open("train_nn_20ep", "wb"))
