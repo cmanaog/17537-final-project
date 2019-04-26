@@ -61,7 +61,7 @@ def get_results(pred, r1, r2):
     p_corr_appr_b = tp_b / float(tp_b + fn_b)
     p_corr_appr_w = tp_w / float(tp_w + fn_w)
     equality_gap_appr = abs(p_corr_appr_b - p_corr_appr_w)
-    
+
     return [parity_gap, equality_gap_appr, equality_gap_denied]
 
 
@@ -84,8 +84,10 @@ White = 4
 
 for i in range(5):
     for j in range(i+1, 5):
-        print("RF: (%d, %d) => %f"%(i, j, get_results(pred_rf, i, j)[0]))
+        rf = get_results(pred_rf, i, j)
+        print("RF: (%d, %d) => %f %f %f"%(i, j, rf[0], rf[1], rf[2]))
         # print("GB: (%d, %d) => %f"%(i, j, get_results(pred_gb, i, j)[0]))
         # print("KN: (%d, %d) => %f"%(i, j, get_results(pred_kn, i, j)[0]))
-        print("LR: (%d, %d) => %f"%(i, j, get_results(pred_lg, i, j)[0]))
+        lg = get_results(pred_lg, i, j)
+        print("LR: (%d, %d) => %f %f %f"%(i, j, lg[0], lg[1], lg[2]))
         print("\n")
