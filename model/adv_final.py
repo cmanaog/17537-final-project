@@ -50,7 +50,7 @@ class Ann(object):
         first_layer = self.relu(data.dot(self.weights)) # 1 x n_hidden
 
         # the vector that feeds into the activation function
-        first_layer_into_node = np.array(data.dot(self.weights)) # 1 x n_hidden 
+        first_layer_into_node = np.array(data.dot(self.weights)) # 1 x n_hidden
 
         logit = first_layer
         res = np.matrix(first_layer) * np.matrix(self.output_weights).transpose()
@@ -77,22 +77,22 @@ class Ann(object):
         @param: train(1d list) - input values
         @return: None - updates weights of neural net using grad. desc.
         '''
-        
+
         error = truth - output
         self.delta_k = np.matrix(error).transpose() * np.matrix(self.output_deriv) # 1x2
         # print("first der", self.first_layer_deriv.shape)
         # print("out w", np.matrix(self.output_weights).shape)
         # print("dk", self.delta_k.shape)
         self.delta_h = np.matrix(self.first_layer_deriv) * np.matrix(self.output_weights).transpose() * np.matrix(self.delta_k) # 32x32, 32x2,2x1
-        
+
         # update the weights b/w hidden layer and output
         gradient_top = self.learning_rate * np.matrix(self.hidden_layer_out).transpose() * np.matrix(self.delta_k) # 32 x 1
         self.output_weights = self.output_weights + gradient_top.transpose()
 
-        
+
         gradient_bottom = self.learning_rate * np.matrix(train).transpose() * np.matrix(self.delta_h).transpose() # 32 x 1
         #gradient_bottom = self.clip(gradient_bottom)
-        self.weights = self.weights + gradient_bottom 
+        self.weights = self.weights + gradient_bottom
 
 
     def softmax(self, x, y = None, deriv = False):
@@ -142,8 +142,8 @@ class Adv(Ann):
     def update_weights(self, output, truth, train, main_nn, main_train):
         # top: d ce / d soft * d soft / d relu * d relu / d main out * d main out / w
         # btm: d ce / d soft * d soft / d relu * d relu / d main out * d main out / main hid out * d main hid out / w
-        
-        # ADV UPDATES 
+
+        # ADV UPDATES
         error = np.zeros(self.n_classes)
         error[int(truth)] = 1
         self.delta_k = np.matrix(error) * np.matrix(self.output_deriv) # 1x5
@@ -153,7 +153,7 @@ class Adv(Ann):
         gradient_top = self.learning_rate * np.matrix(self.hidden_layer_out).transpose() * np.matrix(self.delta_k) # 32x1 , 1x5
 
 
-        gradient_bottom = self.learning_rate * np.matrix(self.delta_h) * np.matrix(train)#32x32 
+        gradient_bottom = self.learning_rate * np.matrix(self.delta_h) * np.matrix(train)#32x32
 
         # # MAIN NET UPDATES
         self.delta_q = np.matrix(main_nn.first_layer_deriv) * np.matrix(self.weights) * np.matrix(self.delta_h)
@@ -163,12 +163,12 @@ class Adv(Ann):
         grad_btm = self.clip(grad_btm)
 
         main_nn.weights = main_nn.weights - self.alpha * grad_btm.transpose()
-        # Adv weights update 
+        # Adv weights update
         gradient_top = self.clip(gradient_top)
         gradient_bottom = self.clip(gradient_bottom)
 
-        self.weights = self.weights + gradient_bottom.transpose() 
-        self.output_weights = self.output_weights + gradient_top 
+        self.weights = self.weights + gradient_bottom.transpose()
+        self.output_weights = self.output_weights + gradient_top
 
 
     def feed_forward(self, train_vec, target, store = False):
@@ -180,7 +180,7 @@ class Adv(Ann):
             [3] = P2 [0, 100            [4] = F[0, 100]
         @return: result (array-like) - 1 x 2 array, probability of class 0 or class 1
         '''
-     
+
         data = np.matrix(train_vec) # 1 x n_in
 
         first_layer = self.relu(data.dot(self.weights)) # 1 x n_hidden, c
@@ -197,7 +197,7 @@ class Adv(Ann):
         pred = np.argmax(result)
 
         if store: # save computation if we're not using backprop
-            
+
             self.hidden_layer_out = first_layer
             self.output = result
             res = np.asarray(first_layer.dot(self.output_weights))
@@ -207,7 +207,7 @@ class Adv(Ann):
             #     print("weights", self.output_weights)
             self.output_deriv = self.softmax(res.flatten(), target, deriv = True)
             self.first_layer_deriv = self.relu(first_layer_into_node, deriv = True)
-        return result, pred 
+        return result, pred
 
 
 
@@ -228,15 +228,15 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
     network = Ann(n_in, n_classes_main, n_hidden, learning_rate, alpha)
     adv = Adv(n_hidden, n_classes_adv, adv_hidden, learning_rate, alpha)
     count = 0
-    
+
     p = round(0.8 * len(train))
     valid_x = train[p:,]
     valid_y = target[:,p:]
-    
+
     train = train[:p,]
     target = target[:, :p]
 
-    
+
     pred_target, adv_target = target[0], target[1]
     losses = []
 
@@ -245,19 +245,19 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
         print("\n")
         print("Epoch %d" % count)
         error_rate = 0
-        
+
         main_error, adv_error = [], []
         prev_w, prev_out_w = None, None
         for row in range(train.shape[0]):
             # Input x to the network and computer output o_u
 
             (logit, main_output) = network.feed_forward(train[row], pred_target[row], store = True)
-            
+
             if len(main_output) != 2:
                 raise Exception("Output length not 5")
             main_error.append(main_output)
             #if np.argmax(main_output[1]) == pred_target[row]: main_correct += 1
-           
+
             # update weights of approval network (Ly)
             network.update_weights(np.argmax(np.asarray(main_output).flatten()), pred_target[row], train[row])
 
@@ -270,20 +270,20 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
             adv.update_weights(adv_output, adv_target[row], logit, network, train[row])
 
         count += 1
-        
+
 #         if count in [1,5,10,15]:
 #             train_name = "train_nn_%dep" % count
 #             adv_name = "adv_nn_%dep" % count
 #             pickle.dump(network, open(train_name, "wb"))
 #             pickle.dump(adv, open(adv_name, "wb"))
-        
+
         #print("up to logg loss")
         #print("target", pred_target)
         #print("error", main_error)
-        error_rate += log_loss(pred_target, main_error) - alpha * log_loss(adv_target, adv_error, labels = (0,1,2,3,4)) 
+        error_rate += log_loss(pred_target, main_error) - alpha * log_loss(adv_target, adv_error, labels = (0,1,2,3,4))
         print("cross entropy loss = " + str(error_rate))
-      
-        
+
+
         #corrects = 0
         valid_error = []
         for row in range(len(valid_x)):
@@ -291,12 +291,12 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
             valid_error.append(output)
         error = log_loss(valid_y[0], valid_error)
         print("Validation cross entropy %f" % round(error, 4))
-        
+
         #losses.append(log_loss(pred_target, main_error) - alpha * log_loss(adv_target, adv_error, labels = (0,1,2,3,4)))
     #print("Main Acc", main_train_accs)
     #print("Adv Acc", adv_train_accs)
     print("Total losses", losses)
-    
+
     #df = pd.DataFrame({"main_acc": main_train_accs, "adv_acc" : adv_train_accs, "losses" : losses, "epoch": list(range(1,21))})
     #pd.to_csv(df, "metrics.csv")
     return network, adv, losses
@@ -314,12 +314,13 @@ def main():
     alpha = 0 # tuning param for adversary
     ##################################################
     print("Reading in data")
-    x_train = np.load("x_train_data.npy")[:100000,]
-    y_train = np.load("y_train_data.npy")[:,:100000]
+    train_data = pd.read_csv("train_clean.csv")
+    x_train = np.asarray(train_data.iloc[:, 0:-1], dtype = np.float64)
+    y_train = np.asarray(train_data.iloc[:, -1],dtype = np.float64)
 
-    x_test = np.load("x_test_data.npy")[:100000,]
-    y_test = np.load("y_test_data.npy")[:,:100000]
-
+    test_data = pd.read_csv("test_clean.csv")
+    x_test = np.asarray(test_data.iloc[:, 0:-1], dtype = np.float64)
+    y_test = np.asarray(test_data.iloc[:, -1],dtype = np.float64)
 
     print("Completed reading in data")
     print("Beginning training")
@@ -334,11 +335,14 @@ def main():
     sys.stdout.write("TRAINING COMPLETED! NOW PREDICTING.\n")
 
     test_errors = []
+    pred = []
     for row in range(len(x_test)):
         _, output = trained_nn.feed_forward(x_test[row], y_test[0][row])
         test_errors.append(output)
+        pred.append(np.argmax(output))
         #if np.argmax(output) == y_test[0][row]: corrects += 1
 
+    np.save("adv_pred_y.npy", pred)
     test_error_rate = log_loss(y_test[0], test_errors)
     print("\n")
     print("Test cross entropy: %f " % test_error_rate)
