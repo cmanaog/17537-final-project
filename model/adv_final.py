@@ -24,7 +24,7 @@ class Ann(object):
         self.n_out = n_hidden # shape of weights for final layer
         self.learning_rate = learning_rate
         self.weights = np.random.uniform(-0.05, 0.05, (self.n_in, self.n_hidden))
-        self.output_weights = np.random.uniform(-0.05, 0.05, self.n_out) # output weights
+        self.output_weights = np.random.uniform(-0.05, 0.05, (self.n_out, self.n_classes)) # output weights
         self.hidden_layer_out = np.zeros(self.n_out)
         self.first_layer_deriv = np.zeros(self.n_out)
         self.output_deriv = 0
@@ -53,21 +53,24 @@ class Ann(object):
         first_layer_into_node = np.array(data.dot(self.weights)) # 1 x n_hidden 
 
         logit = first_layer
-        res = np.matrix(first_layer) * np.matrix(self.output_weights).transpose()
-        res = np.asarray(res).flatten()
+        res = np.matrix(first_layer) * np.matrix(self.output_weights) # 32x1  32x2 = 1x2
+        
+        #print(res)
+        result = np.asarray(res).flatten()
+        probs = self.softmax(result)
 
-        result[1] = self.sigmoid(res[0]) # probablity of class 1
-        result[0] = 1 - result[1].flatten()[0] # probability of class 0
+        #result[1] = self.sigmoid(res[0]) # probablity of class 1
+        #result[0] = 1 - result[1].flatten()[0] # probability of class 0
         #print(result)
         # if result > 0.5: result = 1
         # else: result = 0
 
         if store: # save computation if we're not using backprop
             self.hidden_layer_out = first_layer
-            self.output_deriv =  self.sigmoid(res[0], deriv = True)
+            self.output_deriv =  self.softmax(result, deriv = True)
             self.first_layer_deriv = self.relu(first_layer_into_node, deriv = True)
             #self.first_layer_deriv[-1] = 1 # We think this is bias
-        return (logit, result)
+        return (logit, probs)
 
 
     def update_weights(self, output, truth, train):
@@ -77,35 +80,39 @@ class Ann(object):
         @param: train(1d list) - input values
         @return: None - updates weights of neural net using grad. desc.
         '''
-        
-        error = truth - output
-        self.delta_k = np.matrix(error).transpose() * np.matrix(self.output_deriv) # 1x2
-        # print("first der", self.first_layer_deriv.shape)
-        # print("out w", np.matrix(self.output_weights).shape)
-        # print("dk", self.delta_k.shape)
-        self.delta_h = np.matrix(self.first_layer_deriv) * np.matrix(self.output_weights).transpose() * np.matrix(self.delta_k) # 32x32, 32x2,2x1
+        error = np.zeros(self.n_classes)
+        error[int(truth)] = -(1 / (output + 1e-10))
+        #print(self.output_deriv)
+        self.delta_k = np.matrix(error) * np.matrix(self.output_deriv).transpose() # 1x2, 2x2 = 1x2
+        self.delta_h = np.matrix(self.first_layer_deriv) * np.matrix(self.output_weights) * np.matrix(self.delta_k).transpose() # 32x32, 32x2, 1x2 = 32x1
+        # delta h should be 1 x 32
         
         # update the weights b/w hidden layer and output
-        gradient_top = self.learning_rate * np.matrix(self.hidden_layer_out).transpose() * np.matrix(self.delta_k) # 32 x 1
-        self.output_weights = self.output_weights + gradient_top.transpose()
+
+        gradient_top = self.learning_rate * np.matrix(self.hidden_layer_out).transpose() * np.matrix(self.delta_k) # 32 x 1, 2x1 = 32x2
+        gradient_top = np.clip(gradient_top, -0.1, 0.1)
+        self.output_weights = self.output_weights + gradient_top
 
         
-        gradient_bottom = self.learning_rate * np.matrix(train).transpose() * np.matrix(self.delta_h).transpose() # 32 x 1
-        #gradient_bottom = self.clip(gradient_bottom)
+        gradient_bottom = self.learning_rate * np.matrix(train).transpose() * np.matrix(self.delta_h).transpose() # 32 x 31x1, 32x1 = 31x32
+        gradient_bottom = np.clip(gradient_bottom, -0.1, 0.1)
         self.weights = self.weights + gradient_bottom 
 
 
-    def softmax(self, x, y = None, deriv = False):
+    def softmax(self, x, deriv = False):
         x_norm = (x - np.min(x)) / (np.max(x) - np.min(x) + 1)
         probs = np.asarray(np.exp(x_norm) / sum(np.exp(x_norm))).flatten()
+        
         if deriv: #d cross / d soft * d soft / d relu output, no need for dJ in update_weights
-            res = np.zeros((5,5))
-            for i in range(5):
-                for j in range(5):
+            res = np.zeros((self.n_classes,self.n_classes))
+            for i in range(self.n_classes):
+                for j in range(self.n_classes):
                     if i == j:
                         res[i,j] = probs[i] * (1 - probs[i])
                     else:
                         res[i,j] = probs[i] * - probs[j]
+            # print(probs)
+            # print(res)
             return res
         return probs
 
@@ -145,7 +152,7 @@ class Adv(Ann):
         
         # ADV UPDATES 
         error = np.zeros(self.n_classes)
-        error[int(truth)] = 1
+        error[int(truth)] = - 1 / output # probability of class truth
         self.delta_k = np.matrix(error) * np.matrix(self.output_deriv) # 1x5
         self.delta_h = np.matrix(self.first_layer_deriv) * np.matrix(self.output_weights) * self.delta_k.transpose()  # 32 x 32, 32x5,  1x5
 
@@ -164,8 +171,8 @@ class Adv(Ann):
 
         main_nn.weights = main_nn.weights - self.alpha * grad_btm.transpose()
         # Adv weights update 
-        gradient_top = self.clip(gradient_top)
-        gradient_bottom = self.clip(gradient_bottom)
+        gradient_top = np.clip(gradient_top, -0.01, 0.01)
+        gradient_bottom = np.clip(gradient_bottom, -0.01, 0.01)
 
         self.weights = self.weights + gradient_bottom.transpose() 
         self.output_weights = self.output_weights + gradient_top 
@@ -205,13 +212,13 @@ class Adv(Ann):
             #     raise Exception()
             #     print("first layer",first_layer)
             #     print("weights", self.output_weights)
-            self.output_deriv = self.softmax(res.flatten(), target, deriv = True)
+            self.output_deriv = self.softmax(res.flatten(), deriv = True)
             self.first_layer_deriv = self.relu(first_layer_into_node, deriv = True)
         return result, pred 
 
 
 
-def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 0.1, alpha = 1):
+def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 0.1, alpha = 1, epochs = 30):
     '''
     @param: train (2d list) - training input data
     @param: target (1d list) - output data from training data
@@ -224,27 +231,39 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
     # and n_out output units
     # Init all network weights to small random numbers (between [-0.05,0.05])
     start = time.time()
+    full_data = np.concatenate((train,target.transpose()), axis = 1)
+
     n_classes_main, n_classes_adv = n_classes
     network = Ann(n_in, n_classes_main, n_hidden, learning_rate, alpha)
     adv = Adv(n_hidden, n_classes_adv, adv_hidden, learning_rate, alpha)
     count = 0
     
     p = round(0.8 * len(train))
-    valid_x = train[p:,]
-    valid_y = target[:,p:]
-    
-    train = train[:p,]
-    target = target[:, :p]
+    valid = full_data[p:,]
 
+    np.random.shuffle(valid)
+    valid_x = valid[:,:-2]
+    valid_y = valid[:,-2:].transpose()
     
-    pred_target, adv_target = target[0], target[1]
+    
+    train_full = full_data[:p,]
+
     losses = []
 
 
-    while count < 10:
+    while count < epochs:
         print("\n")
-        print("Epoch %d" % count)
+        print("Epoch: %d" % count)
+        start = time.time()
+        np.random.shuffle(train_full)
+
+        train = train_full[:,:-2]
+        target = train_full[:,-2:].transpose()
+        pred_target, adv_target = target[0], target[1]
+        end = time.time()
         error_rate = 0
+
+
         
         main_error, adv_error = [], []
         prev_w, prev_out_w = None, None
@@ -259,7 +278,7 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
             #if np.argmax(main_output[1]) == pred_target[row]: main_correct += 1
            
             # update weights of approval network (Ly)
-            network.update_weights(np.argmax(np.asarray(main_output).flatten()), pred_target[row], train[row])
+            network.update_weights(np.argmax(np.asarray(main_output).flatten()), main_output[1], train[row])
 
             # get output for race
                 # another feed_forward with logit as the input
@@ -267,7 +286,7 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
             adv_error.append(adv_softmax)
 
             # # calculate the partial for main nn and update the weight for race nn (Ld)
-            adv.update_weights(adv_output, adv_target[row], logit, network, train[row])
+            adv.update_weights(adv_softmax[int(pred_target[row])], adv_target[row], logit, network, train[row])
 
         count += 1
         
@@ -308,14 +327,15 @@ def main():
     @param: test (str) - path to testing data (2d)
     '''
     ################## TUNING ########################
-    n_hidden = 128 # magic number, change to tune neural net
-    adv_hidden = 100
+    n_hidden = 32 # magic number, change to tune neural net
+    adv_hidden = 32
     eta = 0.001 # magic number, change to tune neural net
     alpha = 0 # tuning param for adversary
+    epochs = 30
     ##################################################
     print("Reading in data")
-    x_train = np.load("x_train_data.npy")[:100000,]
-    y_train = np.load("y_train_data.npy")[:,:100000]
+    x_train = np.load("x_train_data.npy")[:20000,]
+    y_train = np.load("y_train_data.npy")[:,:20000]
 
     x_test = np.load("x_test_data.npy")[:100000,]
     y_test = np.load("y_test_data.npy")[:,:100000]
@@ -326,7 +346,7 @@ def main():
     n_in = x_train.shape[1]
     n_classes = 2, 5#len(set(y_test[0])), len(set(y_test[1]))
     start = time.time()
-    trained_nn, trained_adv, losses = train(x_train, y_train, n_in, n_classes, n_hidden, adv_hidden, eta, alpha)
+    trained_nn, trained_adv, losses = train(x_train, y_train, n_in, n_classes, n_hidden, adv_hidden, eta, alpha, epochs)
     end = time.time()
     print("Total train time: %d min %d sec" % ((end - start) // 60, (end - start) % 60))
     print("Training losses")
@@ -339,7 +359,7 @@ def main():
         test_errors.append(output)
         #if np.argmax(output) == y_test[0][row]: corrects += 1
 
-    test_error_rate = log_loss(y_test[0], test_errors)
+    test_error_rate = log_loss(y_test[0], test_errors, labels = [1,0])
     print("\n")
     print("Test cross entropy: %f " % test_error_rate)
     # saving model
