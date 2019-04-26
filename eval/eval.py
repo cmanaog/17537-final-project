@@ -84,10 +84,10 @@ White = 4
 
 for i in range(5):
     for j in range(i+1, 5):
-        rf = get_results(pred_rf, i, j)
-        print("RF: (%d, %d) => %f %f %f"%(i, j, rf[0], rf[1], rf[2]))
+        rf = get_results(pred_lg, i, j)
+        print("(%d,%d),%f,%f,%f"%(i, j, rf[0], rf[1], rf[2]))
         # print("GB: (%d, %d) => %f"%(i, j, get_results(pred_gb, i, j)[0]))
         # print("KN: (%d, %d) => %f"%(i, j, get_results(pred_kn, i, j)[0]))
-        lg = get_results(pred_lg, i, j)
-        print("LR: (%d, %d) => %f %f %f"%(i, j, lg[0], lg[1], lg[2]))
-        print("\n")
+        #lg = get_results(pred_lg, i, j)
+        #print("LR: (%d, %d) => %f %f %f"%(i, j, lg[0], lg[1], lg[2]))
+        #print("\n")
