@@ -151,21 +151,23 @@ class Adv(Ann):
 
         # update the weights b/w hidden layer and output
         gradient_top = self.learning_rate * np.matrix(self.hidden_layer_out).transpose() * np.matrix(self.delta_k) # 32x1 , 1x5
-        gradient_bottom = self.learning_rate * np.matrix(train) * np.matrix(self.delta_h) #32x32 
+
+
+        gradient_bottom = self.learning_rate * np.matrix(self.delta_h) * np.matrix(train)#32x32 
 
         # # MAIN NET UPDATES
         self.delta_q = np.matrix(main_nn.first_layer_deriv) * np.matrix(self.weights) * np.matrix(self.delta_h)
         #32x32, 32x32, 1x32
-        grad_btm = np.matrix(main_train).transpose() * np.matrix(self.delta_q).transpose()
+        grad_btm = np.matrix(self.delta_q) * np.matrix(main_train)
         # 31x1, 32x1
         grad_btm = self.clip(grad_btm)
 
-        main_nn.weights = main_nn.weights - self.alpha * grad_btm
+        main_nn.weights = main_nn.weights - self.alpha * grad_btm.transpose()
         # Adv weights update 
         gradient_top = self.clip(gradient_top)
         gradient_bottom = self.clip(gradient_bottom)
 
-        self.weights = self.weights + gradient_bottom 
+        self.weights = self.weights + gradient_bottom.transpose() 
         self.output_weights = self.output_weights + gradient_top 
 
 
@@ -278,7 +280,7 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
         #print("up to logg loss")
         #print("target", pred_target)
         #print("error", main_error)
-        error_rate += log_loss(pred_target, main_error) #- alpha * log_loss(adv_target, adv_error, labels = (0,1,2,3,4)) 
+        error_rate += log_loss(pred_target, main_error) - alpha * log_loss(adv_target, adv_error, labels = (0,1,2,3,4)) 
         print("cross entropy loss = " + str(error_rate))
       
         
@@ -306,17 +308,17 @@ def main():
     @param: test (str) - path to testing data (2d)
     '''
     ################## TUNING ########################
-    n_hidden = 32 # magic number, change to tune neural net
-    adv_hidden = 32
-    eta = 0.01 # magic number, change to tune neural net
-    alpha = 0.1 # tuning param for adversary
+    n_hidden = 128 # magic number, change to tune neural net
+    adv_hidden = 100
+    eta = 0.001 # magic number, change to tune neural net
+    alpha = 0 # tuning param for adversary
     ##################################################
     print("Reading in data")
-    x_train = np.load("x_train_data.npy")[:1000,]
-    y_train = np.load("y_train_data.npy")[:,:1000]
+    x_train = np.load("x_train_data.npy")[:100000,]
+    y_train = np.load("y_train_data.npy")[:,:100000]
 
-    x_test = np.load("x_test_data.npy")[:500,]
-    y_test = np.load("y_test_data.npy")[:,:500]
+    x_test = np.load("x_test_data.npy")[:100000,]
+    y_test = np.load("y_test_data.npy")[:,:100000]
 
 
     print("Completed reading in data")
@@ -336,7 +338,8 @@ def main():
         _, output = trained_nn.feed_forward(x_test[row], y_test[0][row])
         test_errors.append(output)
         #if np.argmax(output) == y_test[0][row]: corrects += 1
-    test_error_rate = log_loss(y_test[0][row], test_errors)
+
+    test_error_rate = log_loss(y_test[0], test_errors)
     print("\n")
     print("Test cross entropy: %f " % test_error_rate)
     # saving model
