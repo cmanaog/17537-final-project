@@ -43,7 +43,7 @@ class Ann(object):
         first_layer = self.relu(data.dot(self.weights)) # 1 x n_hidden
 
         # the vector that feeds into the activation function
-        first_layer_into_node = np.array(data.dot(self.weights)) # 1 x n_hidden 
+        first_layer_into_node = np.array(data.dot(self.weights)) # 1 x n_hidden
 
         logit = first_layer
         res = np.matrix(first_layer) * np.matrix(self.output_weights) # 32x1  32x2 = 1x2
@@ -83,7 +83,6 @@ class Ann(object):
 
         gradient_top = self.learning_rate * np.matrix(self.hidden_layer_out).transpose() * np.matrix(self.delta_k) # 32 x 1, 2x1 = 32x2
         gradient_top = np.clip(gradient_top, -1, 1)
-
         
         gradient_bottom = self.learning_rate * np.matrix(train).transpose() * np.matrix(self.delta_h).transpose() # 32 x 31x1, 32x1 = 31x32
         gradient_bottom = np.clip(gradient_bottom, -1, 1)
@@ -141,9 +140,7 @@ class Adv(Ann):
     def update_weights(self, output, truth, train, main_nn, main_train):
         # top: d ce / d soft * d soft / d relu * d relu / d main out * d main out / w
         # btm: d ce / d soft * d soft / d relu * d relu / d main out * d main out / main hid out * d main hid out / w
-        
-        # ADV UPDATES 
-        
+        # ADV UPDATES
         error = np.zeros(self.n_classes)
         error[int(truth)] = - 1 / output # probability of class truth
         self.delta_k = np.matrix(error) * np.matrix(self.output_deriv) # 1x5
@@ -166,8 +163,6 @@ class Adv(Ann):
         gradient_bottom = np.clip(gradient_bottom, -1, 1)
         return gradient_top, gradient_bottom, grad_btm
          
-
-
     def feed_forward(self, train_vec, target, store = False):
         '''
       @param: train_vec (1d list) - training examples
@@ -177,7 +172,7 @@ class Adv(Ann):
             [3] = P2 [0, 100            [4] = F[0, 100]
         @return: result (array-like) - 1 x 2 array, probability of class 0 or class 1
         '''
-     
+
         data = np.matrix(train_vec) # 1 x n_in
 
         first_layer = self.relu(data.dot(self.weights)) # 1 x n_hidden, c
@@ -194,7 +189,7 @@ class Adv(Ann):
         pred = np.argmax(result)
 
         if store: # save computation if we're not using backprop
-            
+
             self.hidden_layer_out = first_layer
             self.output = result
             res = np.asarray(first_layer.dot(self.output_weights))
@@ -204,7 +199,7 @@ class Adv(Ann):
             #     print("weights", self.output_weights)
             self.output_deriv = self.softmax(res.flatten(), deriv = True)
             self.first_layer_deriv = self.relu(first_layer_into_node, deriv = True)
-        return result, pred 
+        return result, pred
 
 
 
@@ -227,7 +222,7 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
     network = Ann(n_in, n_classes_main, n_hidden, learning_rate, alpha)
     adv = Adv(n_hidden, n_classes_adv, adv_hidden, learning_rate, alpha)
     count = 0
-    
+
     p = round(0.8 * len(train))
     valid = full_data[p:,]
 
@@ -237,7 +232,6 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
     
     
     train_full = full_data[:p,]
-
     train_losses = []
     valid_losses = []
 
@@ -312,7 +306,6 @@ def train(train, target, n_in, n_classes, n_hidden, adv_hidden, learning_rate = 
         print("cross entropy loss = " + str(error_rate))
       
         train_losses.append(error_rate)
-
         #corrects = 0
         valid_error = []
         for row in range(len(valid_x)):
@@ -343,12 +336,13 @@ def main():
     batch_size = 32
     ##################################################
     print("Reading in data")
-    x_train = np.load("x_train_data.npy")[:10000,]
-    y_train = np.load("y_train_data.npy")[:,:10000]
+    train_data = pd.read_csv("train_clean.csv")
+    x_train = np.asarray(train_data.iloc[:, 0:-1], dtype = np.float64)
+    y_train = np.asarray(train_data.iloc[:, -1],dtype = np.float64)
 
-    x_test = np.load("x_test_data.npy")[:1000,]
-    y_test = np.load("y_test_data.npy")[:,:1000]
-
+    test_data = pd.read_csv("test_clean.csv")
+    x_test = np.asarray(test_data.iloc[:, 0:-1], dtype = np.float64)
+    y_test = np.asarray(test_data.iloc[:, -1],dtype = np.float64)
 
     print("Completed reading in data")
     print("Beginning training")
@@ -363,9 +357,11 @@ def main():
     sys.stdout.write("TRAINING COMPLETED! NOW PREDICTING.\n")
 
     test_errors = []
+    pred = []
     for row in range(len(x_test)):
         _, output = trained_nn.feed_forward(x_test[row], y_test[0][row])
         test_errors.append(output)
+        pred.append(np.argmax(output))
         #if np.argmax(output) == y_test[0][row]: corrects += 1
 
     test_error_rate = log_loss(y_test[0], test_errors, labels = [1,0])
@@ -376,6 +372,5 @@ def main():
     pickle.dump(trained_nn, open("train_nn", "wb"))
     pickle.dump(trained_adv, open("trained_adv", "wb"))
     print("SAVED MODEL")
-    
-    
+    np.save("adv_pred_y.npy", pred)
 main()
